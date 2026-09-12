@@ -1,0 +1,9 @@
+model: yolo11n.pt
+data_yaml: data/fall/data.yaml
+epochs: 30
+image_size: 640
+batch_size: 16
+device: auto
+confidence: 0.25
+project_dir: runs/fall_detection
+run_name: train

@@ -1,0 +1,11 @@
+# Core fall-detection framework
+ultralytics>=8.3,<9.0
+
+# Configuration files
+PyYAML>=6.0,<7.0
+
+# Image, video, and webcam input
+opencv-python>=4.10,<5.0
+
+# Development and unit testing
+pytest>=8.0,<9.0

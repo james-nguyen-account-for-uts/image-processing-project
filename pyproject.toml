@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fall-detection-foundation"
+version = "0.1.0"
+description = "Simple YOLO-based fall detection project foundation"
+requires-python = ">=3.10"
+dependencies = [
+  "PyYAML>=6.0",
+  "ultralytics>=8.3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+fall-train = "fall_detection.train:main"
+fall-evaluate = "fall_detection.evaluate:main"
+fall-detect = "fall_detection.detect:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
