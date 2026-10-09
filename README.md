@@ -63,6 +63,18 @@ pip install -r requirements.txt
 pip install -e .
 ```
 
+For NVIDIA GPU training on Windows, replace the CPU PyTorch packages installed
+by the command above with a CUDA build, then confirm that CUDA is available:
+
+```powershell
+.venv\Scripts\python.exe -m pip uninstall -y torch torchvision
+.venv\Scripts\python.exe -m pip install torch torchvision --index-url https://download.pytorch.org/whl/cu128
+.venv\Scripts\python.exe -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
+```
+
+The default configuration uses GPU `0` when it is available. If CUDA is not
+installed, set `device: auto` in `configs/default.yaml` to use CPU fallback.
+
 (for Windows) If PowerShell blocks activation, run the following command once in that terminal and then activate the environment again:
 
 ```powershell
