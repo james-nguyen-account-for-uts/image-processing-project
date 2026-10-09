@@ -10,6 +10,8 @@ requires-python = ">=3.10"
 dependencies = [
   "PyYAML>=6.0",
   "ultralytics>=8.3",
+  "numpy>=1.24",
+  "Pillow>=10.0",
 ]
 
 [project.optional-dependencies]
@@ -19,6 +21,7 @@ dev = ["pytest>=8.0"]
 fall-train = "fall_detection.train:main"
 fall-evaluate = "fall_detection.evaluate:main"
 fall-detect = "fall_detection.detect:main"
+fall-geometry = "fall_detection.geometry:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
