@@ -113,6 +113,24 @@ def load_config(path: str | Path) -> GeometrySettings:
     return settings
 
 
+def parse_yolo_box(line: str, path: Path, line_number: int, names: dict) -> tuple:
+    try:
+        parts = line.split()
+        if len(parts) != 5:
+            raise ValueError("expected class_id cx cy width height")
+        class_id = int(parts[0])
+        cx, cy, width, height = map(float, parts[1:])
+        if class_id not in names:
+            raise ValueError(f"unknown class_id {class_id}")
+        if not all(math.isfinite(v) for v in (cx, cy, width, height)):
+            raise ValueError("box coordinates must be finite")
+        if not (0 <= cx <= 1 and 0 <= cy <= 1 and 0 < width <= 1 and 0 < height <= 1):
+            raise ValueError("expected normalised centres in [0, 1] and sizes in (0, 1]")
+    except ValueError as error:
+        raise ValueError(f"{path}:{line_number}: {error}") from error
+    return class_id, cx, cy, width, height
+
+
 def load_split(data_yaml: str | Path, split: str, settings: GeometrySettings) -> DatasetSplit:
     """Read image dimensions and labels; reject missing or malformed annotations."""
     yaml_path = Path(data_yaml).resolve()
@@ -161,20 +179,7 @@ def load_split(data_yaml: str | Path, split: str, settings: GeometrySettings) ->
         for line_number, line in enumerate(lines, 1):
             if not line.strip():
                 continue
-            try:
-                parts = line.split()
-                if len(parts) != 5:
-                    raise ValueError("expected class_id cx cy width height")
-                class_id = int(parts[0])
-                cx, cy, width, height = map(float, parts[1:])
-                if class_id not in names:
-                    raise ValueError(f"unknown class_id {class_id}")
-                if not all(math.isfinite(v) for v in (cx, cy, width, height)):
-                    raise ValueError("box coordinates must be finite")
-                if not (0 <= cx <= 1 and 0 <= cy <= 1 and 0 < width <= 1 and 0 < height <= 1):
-                    raise ValueError("expected normalised centres in [0, 1] and sizes in (0, 1]")
-            except ValueError as error:
-                raise ValueError(f"{label_path}:{line_number}: {error}") from error
+            class_id, cx, cy, width, height = parse_yolo_box(line, label_path, line_number, names)
             class_name = names[class_id]
             class_counts[class_name] += 1
             if class_name == settings.no_person_class:
@@ -301,35 +306,197 @@ def evaluate_rule(rule: GeometryRule, split: DatasetSplit, output_dir: Path, rep
     return metrics
 
 
+def class_mapping(settings: GeometrySettings) -> dict:
+    return {"fall": settings.fall_class, "up": settings.upright_class,
+            "excluded_no_person": settings.no_person_class}
+
+
+def select_model(validation: DatasetSplit, settings: GeometrySettings) -> tuple[dict, list[GeometryRule]]:
+    rules, selection = tune_rules(validation.regions)
+    truth = np.array([x.true_fall for x in validation.regions])
+    metrics = {r.name: classification_metrics(truth, r.predict(validation.regions)) for r in rules}
+    selected_rule = max(rules, key=lambda r: (
+        metrics[r.name]["fall_f1"], metrics[r.name]["fall_recall"], r.name == "aspect_ratio"))
+    model = {"schema_version": 1, "evaluation_unit": "annotated_person_region",
+             "class_mapping": class_mapping(settings), "rules": [asdict(r) for r in rules],
+             "selection": selection, "selected_rule_by_validation": selected_rule.name,
+             "validation_input_sha256": validation.fingerprint}
+    return model, rules
+
+
+def load_saved_rules(path: str | Path, settings: GeometrySettings) -> tuple[dict, list[GeometryRule]]:
+    model = json.loads(Path(path).read_text(encoding="utf-8"))
+    if (not isinstance(model, dict) or model.get("schema_version") != 1
+            or model.get("evaluation_unit") != "annotated_person_region"
+            or model.get("class_mapping") != class_mapping(settings)):
+        raise ValueError("Saved rule schema/class mapping does not match this experiment")
+    rules = [GeometryRule(**r) for r in model["rules"]]
+    if {r.name for r in rules} != {"aspect_ratio", "aspect_ratio_position"} or len(rules) != 2:
+        raise ValueError("Saved model must contain both geometry variants")
+    if model.get("selected_rule_by_validation") not in {r.name for r in rules}:
+        raise ValueError("Saved selected rule is invalid")
+    return model, rules
+
+
+def write_stage_results(settings: GeometrySettings, model: dict, rules: list[GeometryRule],
+                        split: DatasetSplit, output_dir: Path, stage: str, model_path: Path) -> dict:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    write_csv(output_dir / f"{split.name}_excluded.csv", split.excluded,
+              ["image", "region_id", "original_class", "reason"])
+    metrics = {r.name: evaluate_rule(r, split, output_dir, settings.timing_repeats) for r in rules}
+    results = {
+        "method": "geometry", "stage": stage, "evaluation_unit": "annotated_person_region",
+        "input": "ground-truth supplied person boxes", "settings": asdict(settings), "model": model,
+        "model_path": str(model_path), "output_dir": str(output_dir),
+        "environment": {"python": platform.python_version(), "platform": platform.platform(),
+                        "processor": platform.processor(), "numpy": np.__version__,
+                        "pillow": pillow_version, "pyyaml": yaml.__version__},
+        "dataset_yaml_sha256": hashlib.sha256(Path(settings.data_yaml).read_bytes()).hexdigest(),
+        "splits": {split.name: {"dataset": split.summary(), "rules": metrics}},
+        "limitations": ["Scores use supplied person boxes and do not evaluate localisation.",
+                        "No-person/empty annotations are excluded, not counted as true negatives.",
+                        "Cross-split duplicates and same-source frames are not audited by this command."],
+    }
+    (output_dir / "metrics.json").write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    lines = [f"# Geometry {stage}", "", f"Split: {split.name}; unit: annotated person region.",
+             f"Validation-selected rule: {model['selected_rule_by_validation']}.", "",
+             "| Rule | Regions | Precision | Recall | F1 | TP | FP | TN | FN |",
+             "|---|---:|---:|---:|---:|---:|---:|---:|---:|"]
+    for name, m in metrics.items():
+        lines.append(f"| {name} | {m['sample_count']} | {m['fall_precision']:.4f} | {m['fall_recall']:.4f} | "
+                     f"{m['fall_f1']:.4f} | {m['tp']} | {m['fp']} | {m['tn']} | {m['fn']} |")
+    lines.extend(["", *results["limitations"]])
+    (output_dir / "summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return results
+
+
+def calibrate(config_path: str | Path) -> dict:
+    """Select and save thresholds using validation only; never open test inputs."""
+    settings = load_config(config_path)
+    validation = load_split(settings.data_yaml, "val", settings)
+    model, rules = select_model(validation, settings)
+    root = Path(settings.output_dir)
+    root.mkdir(parents=True, exist_ok=True)
+    model_path = root / "model.json"
+    model_path.write_text(json.dumps(model, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return write_stage_results(settings, model, rules, validation, root / "calibration", "calibration", model_path)
+
+
+def evaluate_saved(config_path: str | Path, model_path: str | Path | None = None, split: str = "test") -> dict:
+    """Evaluate frozen thresholds; never select thresholds or modify the model."""
+    if split not in {"val", "test"}:
+        raise ValueError("Geometry evaluation split must be val or test")
+    settings = load_config(config_path)
+    model_path = Path(model_path) if model_path is not None else Path(settings.output_dir) / "model.json"
+    model, rules = load_saved_rules(model_path, settings)
+    data = load_split(settings.data_yaml, split, settings)
+    return write_stage_results(settings, model, rules, data,
+                               Path(settings.output_dir) / "evaluation" / split, "evaluation", model_path)
+
+
+def predict_image(config_path: str | Path, source: str | Path, model_path: str | Path | None = None,
+                  boxes: list[list[float]] | None = None, labels: str | Path | None = None,
+                  rule_name: str | None = None, output: str | Path | None = None) -> dict:
+    """Apply frozen rules to one image's supplied person regions, without fitting."""
+    if (boxes is None) == (labels is None):
+        raise ValueError("Geometry needs either pixel boxes or a YOLO labels file")
+    settings = load_config(config_path)
+    model_path = Path(model_path) if model_path is not None else Path(settings.output_dir) / "model.json"
+    model, rules = load_saved_rules(model_path, settings)
+    chosen = rule_name or model["selected_rule_by_validation"]
+    rule = next((r for r in rules if r.name == chosen), None)
+    if rule is None:
+        raise ValueError(f"Unknown geometry rule: {chosen}")
+    source = Path(source)
+    if not source.is_file():
+        raise FileNotFoundError(f"Geometry requires an image file: {source}")
+    with Image.open(source) as image:
+        width, height = image.size
+    regions, excluded = [], []
+    if boxes is not None:
+        regions = regions_from_boxes(width, height, boxes, str(source))
+    else:
+        data = yaml.safe_load(Path(settings.data_yaml).read_text(encoding="utf-8"))
+        names = data["names"]
+        names = dict(enumerate(names)) if isinstance(names, list) else {int(k): v for k, v in names.items()}
+        if set(names.values()) != set(class_mapping(settings).values()) or len(names) != 3:
+            raise ValueError("Dataset class names do not match the saved model")
+        path = Path(labels)
+        for number, line in enumerate(path.read_text(encoding="utf-8-sig").splitlines(), 1):
+            if not line.strip():
+                continue
+            class_id, cx, cy, box_width, box_height = parse_yolo_box(line, path, number, names)
+            if names[class_id] == settings.no_person_class:
+                excluded.append({"region_id": number, "reason": "no_person_class_not_a_person_region"})
+                continue
+            # Annotation Fall/Up values are not used to make the prediction.
+            regions.append(Region(str(source), number, "", False, width, height, cx, cy, box_width, box_height))
+    output_path = Path(output) if output is not None else Path(settings.output_dir) / "predictions" / f"{source.stem}.json"
+    protected = {source.resolve(), model_path.resolve()}
+    if labels is not None:
+        protected.add(Path(labels).resolve())
+    if output_path.resolve() in protected:
+        raise ValueError("Prediction output must not overwrite the image, annotations or saved rules")
+    result = {
+        "method": "geometry", "source": str(source), "model_path": str(model_path), "rule": asdict(rule),
+        "input": "supplied_yolo_labels" if labels is not None else "supplied_pixel_boxes",
+        **predict_regions(regions, rule),
+        "image_decision": "Fall if any supplied box is Fall; null if no person region is available",
+        "excluded": excluded, "output_path": str(output_path),
+    }
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return result
+
+
+def regions_from_boxes(width: int, height: int, boxes: list[list[float]], image: str = "") -> list[Region]:
+    """Convert pixel boxes to geometry inputs using the original frame size."""
+    regions = []
+    for number, box in enumerate(boxes, 1):
+        if len(box) != 4 or not all(math.isfinite(v) for v in box):
+            raise ValueError(f"Box {number} must contain four finite pixel coordinates")
+        x1, y1, x2, y2 = box
+        if not (0 <= x1 < x2 <= width and 0 <= y1 < y2 <= height):
+            raise ValueError(f"Box {number} must have positive size and lie inside the image")
+        regions.append(Region(image, number, "", False, width, height,
+                              (x1 + x2) / (2 * width), (y1 + y2) / (2 * height),
+                              (x2 - x1) / width, (y2 - y1) / height))
+    return regions
+
+
+def predict_regions(regions: list[Region], rule: GeometryRule) -> dict:
+    """Shared image/camera decisions; an empty frame is not a No Fall decision."""
+    predictions = rule.predict(regions)
+    return {
+        "person_count": len(regions),
+        "image_prediction": ("Fall" if predictions.any() else "No Fall") if regions else None,
+        "regions": [{"region_id": r.region_id,
+                     "bbox_xyxy": [(r.center_x - r.box_width / 2) * r.image_width,
+                                   (r.center_y - r.box_height / 2) * r.image_height,
+                                   (r.center_x + r.box_width / 2) * r.image_width,
+                                   (r.center_y + r.box_height / 2) * r.image_height],
+                     "aspect_ratio": r.aspect_ratio, "normalized_center_y": r.center_y,
+                     "prediction": "Fall" if p else "No Fall"} for r, p in zip(regions, predictions)],
+    }
+
+
+def print_results(results: dict) -> None:
+    for split, result in results["splits"].items():
+        for name, m in result["rules"].items():
+            print(f"{split} {name}: regions={m['sample_count']}, precision={m['fall_precision']:.4f}, "
+                  f"recall={m['fall_recall']:.4f}, F1={m['fall_f1']:.4f}")
+    print(f"Results saved to {results.get('output_dir', results['settings']['output_dir'])}")
+
+
 def run_experiment(config_path: str | Path, model_path: str | Path | None = None) -> dict:
     settings = load_config(config_path)
     output_dir = Path(settings.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     validation = load_split(settings.data_yaml, "val", settings)
     if model_path is None:
-        rules, selection = tune_rules(validation.regions)
-        validation_metrics = {r.name: classification_metrics(
-            np.array([x.true_fall for x in validation.regions]), r.predict(validation.regions)) for r in rules}
-        selected_rule = max(rules, key=lambda r: (
-            validation_metrics[r.name]["fall_f1"], validation_metrics[r.name]["fall_recall"],
-            r.name == "aspect_ratio"))
-        model = {"schema_version": 1, "evaluation_unit": "annotated_person_region",
-                 "class_mapping": {"fall": settings.fall_class, "up": settings.upright_class,
-                                   "excluded_no_person": settings.no_person_class},
-                 "rules": [asdict(r) for r in rules], "selection": selection,
-                 "selected_rule_by_validation": selected_rule.name,
-                 "validation_input_sha256": validation.fingerprint}
+        model, rules = select_model(validation, settings)
     else:
-        model = json.loads(Path(model_path).read_text(encoding="utf-8"))
-        expected_mapping = {"fall": settings.fall_class, "up": settings.upright_class,
-                            "excluded_no_person": settings.no_person_class}
-        if model.get("schema_version") != 1 or model.get("class_mapping") != expected_mapping:
-            raise ValueError("Saved rule schema/class mapping does not match this experiment")
-        rules = [GeometryRule(**r) for r in model["rules"]]
-        if {r.name for r in rules} != {"aspect_ratio", "aspect_ratio_position"} or len(rules) != 2:
-            raise ValueError("Saved model must contain both geometry variants")
-        if model.get("selected_rule_by_validation") not in {r.name for r in rules}:
-            raise ValueError("Saved selected rule is invalid")
+        model, rules = load_saved_rules(model_path, settings)
     # Freeze both thresholds and the recommended variant before opening test inputs.
     (output_dir / "model.json").write_text(json.dumps(model, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     test = load_split(settings.data_yaml, "test", settings)
@@ -382,11 +549,7 @@ def main() -> None:
     parser.add_argument("--model", help="Reuse frozen model.json thresholds instead of selecting them again")
     args = parser.parse_args()
     results = run_experiment(args.config, args.model)
-    for split, result in results["splits"].items():
-        for name, metrics in result["rules"].items():
-            print(f"{split} {name}: regions={metrics['sample_count']}, precision={metrics['fall_precision']:.4f}, "
-                  f"recall={metrics['fall_recall']:.4f}, F1={metrics['fall_f1']:.4f}")
-    print(f"Results saved to {results['settings']['output_dir']}")
+    print_results(results)
 
 
 if __name__ == "__main__":

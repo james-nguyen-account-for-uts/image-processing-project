@@ -4,6 +4,17 @@ from pathlib import Path
 import yaml
 
 
+def resolve_config(method: str, path: str | None) -> str:
+    if method not in {"yolo", "geometry"}:
+        raise ValueError(f"Unknown detection method: {method}")
+    return path or ("configs/geometry.yaml" if method == "geometry" else "configs/default.yaml")
+
+
+def add_method_arguments(parser) -> None:
+    parser.add_argument("--method", choices=["yolo", "geometry"], default="yolo")
+    parser.add_argument("--config", help="Defaults to configs/default.yaml or configs/geometry.yaml by method")
+
+
 @dataclass(frozen=True)
 class Settings:
     model: str = "yolo11n.pt"

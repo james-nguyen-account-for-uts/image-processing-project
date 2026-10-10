@@ -1,12 +1,21 @@
 import argparse
 from pathlib import Path
 
-from ultralytics import YOLO
-
-from .config import load_settings
+from .config import add_method_arguments, load_settings, resolve_config
 
 
-def train(config_path: str) -> None:
+def train(config_path: str | None = None, *, method: str = "yolo"):
+    config_path = resolve_config(method, config_path)
+    if method == "geometry":
+        from .geometry import calibrate, print_results
+
+        results = calibrate(config_path)
+        print_results(results)
+        print(f"Geometry rules saved to {results['model_path']}")
+        return results
+
+    from ultralytics import YOLO
+
     settings = load_settings(config_path)
     if not Path(settings.data_yaml).is_file():
         raise FileNotFoundError(
@@ -27,9 +36,9 @@ def train(config_path: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Train the fall detector")
-    parser.add_argument("--config", default="configs/default.yaml")
+    add_method_arguments(parser)
     args = parser.parse_args()
-    train(args.config)
+    train(args.config, method=args.method)
 
 
 if __name__ == "__main__":

@@ -83,7 +83,18 @@ installed, set `device: auto` in `configs/default.yaml` to use CPU fallback.
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
-The `pip install -e .` command imports the local `fall_detection` package and creates the three terminal commands used below. Run the installation commands again whenever `requirements.txt` changes.
+The `pip install -e .` command imports the local `fall_detection` package and creates the terminal commands used below. Run the installation commands again whenever `requirements.txt` changes.
+
+On Windows, register the four project commands in your user PATH to run them from
+ordinary PowerShell or Command Prompt without activating `.venv`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/install_local_commands.ps1
+```
+
+Close and reopen the terminal, then run `fall-train`, `fall-evaluate`, `fall-detect`
+or `fall-geometry` from the repository root. These entries use this checkout's
+`.venv`; keep the project at its current location or rerun registration after moving it.
 
 To leave the virtual environment later, run:
 
@@ -110,7 +121,7 @@ data/fall/
 
 ## Running the project
 
-Activate `.venv` whenever you open a new terminal:
+Activate `.venv` whenever you open a new terminal, unless you registered the Windows command entries above:
 
 ```bash
 source .venv/bin/activate        # macOS/Linux
@@ -154,13 +165,28 @@ pytest
 
 ## Bounding-box geometry baseline
 
-Classifies annotated person boxes as Fall or No Fall using aspect ratio and optional vertical position.
+Use `--method geometry` with the same three commands. Training selects thresholds on validation;
+evaluation uses saved rules (test split by default). Image detection requires supplied person boxes;
+camera detection locates people automatically before applying Geometry rules.
 
 ```bash
-fall-geometry --config configs/geometry.yaml
+fall-train --method geometry
+fall-evaluate --method geometry
+fall-detect --method geometry --source photo.jpg --bbox 100 100 500 300
+fall-detect --method geometry --source 0
 ```
 
-Results: `runs/geometry/`. See [experiment details](docs/geometry_experiment.md).
+Repeat `--bbox` for multiple people, or use `--labels photo.txt` for YOLO annotations.
+Camera mode uses `yolo11n.pt` for person boxes only; Geometry decides Fall/No Fall. Press `Q`/`Esc`
+or close the window to stop. Use `--detector-weights other.pt` to change the person detector
+(classes must include `person` or the configured Fall/Up classes), and `--detector-confidence 0.4`
+to change its confidence threshold. Frame results are saved as JSONL; use `--output camera.jsonl`
+for a custom path or `--no-show` for headless operation (stop with Ctrl+C).
+Rules and results are saved to `runs/geometry/`; evaluation and detection accept `--weights` for another `model.json`.
+YOLO remains the default method. The original `fall-geometry` experiment command also remains available.
+
+Without installed console commands, use `python scripts/run_fall.py train --method geometry`
+(replace `train` with `evaluate` or `detect` and pass the same options).
 
 ## Simple team plan
 
