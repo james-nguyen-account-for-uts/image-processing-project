@@ -154,75 +154,13 @@ pytest
 
 ## Bounding-box geometry baseline
 
-This implements the report's two rules on annotated **person regions**:
-
-- Aspect ratio: predict Fall when `r > aspect_threshold`, where
-  `r = (normalised_box_width * image_width) / (normalised_box_height * image_height)`.
-- Aspect ratio plus position: also require `cy >= position_threshold`, where
-  `cy` is the YOLO-normalised vertical box centre (0 at the top, 1 at the bottom).
-
-The baseline receives boxes from the dataset annotations and does not locate
-people in arbitrary images. `fall` is the positive class; `up` is the negative
-class. `0 person` annotations and empty-label images are recorded separately
-and excluded from person-region scoring, rather than counted as true negatives.
-Missing label files and malformed annotations cause an error.
-
-After installing the project again with `pip install -e .`, run:
+Classifies annotated person boxes as Fall or No Fall using aspect ratio and optional vertical position.
 
 ```bash
 fall-geometry --config configs/geometry.yaml
 ```
 
-Or run the module directly from the repository root:
-
-```bash
-python -m fall_detection.geometry --config configs/geometry.yaml
-```
-
-Configuration paths are relative to the working directory. Dataset split paths
-are relative to the dataset YAML directory, or its optional `path` entry; this
-baseline accepts `.../images` directories with sibling `labels` directories.
-Image headers provide the original dimensions; images are not resized for this
-baseline. This matters because a ratio of normalised width to normalised height
-alone is incorrect for non-square images.
-
-Both rules are selected using **validation only**, maximising Fall F1 and then
-Fall recall. Threshold candidates cover all distinct validation decisions.
-Further ties favour lower position thresholds and then lower aspect thresholds;
-if both variants have the same validation F1 and recall, the aspect-only rule is
-recommended. Thresholds and the recommended variant are saved before test data
-is opened. The training split is not used because this rule has no learned
-weights. Test results never select thresholds or the recommended variant.
-
-The default output directory is `runs/geometry/`:
-
-- `model.json`: frozen thresholds, class mapping and selection procedure.
-- `metrics.json`: split counts, Fall precision/recall/F1, TP/FP/TN/FN, Up-region
-  false-positive rate, confusion matrices, timing, environment and input hashes.
-- `summary.md`: validation and test comparison.
-- `{split}_{rule}_predictions.csv`: one record per annotated person region,
-  including source image, annotation line number, features and true/predicted labels.
-- `{split}_{rule}_errors.csv`: false positives and false negatives.
-- `{split}_{rule}_confusion.csv`: a labelled binary confusion matrix.
-- `{split}_excluded.csv`: excluded no-person annotations and empty-label images.
-
-To reuse saved thresholds without selecting them again:
-
-```bash
-fall-geometry --config configs/geometry.yaml --model runs/geometry/model.json
-```
-
-Timing uses one warmup pass and 25 measured passes by default. It includes
-geometry calculation and rule prediction, and excludes disk I/O, person
-localisation, threshold search and output writing. It is a person-region timing,
-not end-to-end image detection latency. The input fingerprints cover image
-identifiers, dimensions and annotation bytes; they do not hash image pixels or
-check cross-split duplicates.
-
-The completed local experiment selected `r > 0.5128939828080229`. Validation F1
-was 0.9477 and test F1 was 0.9202. The best position threshold was 0, so the
-position condition provided no additional benefit under this tested rule family.
-See [the experiment note](docs/geometry_experiment.md) for counts and error analysis.
+Results: `runs/geometry/`. See [experiment details](docs/geometry_experiment.md).
 
 ## Simple team plan
 
