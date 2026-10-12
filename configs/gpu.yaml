@@ -1,4 +1,4 @@
-model: yolo11n.pt
+model: yolov8n.pt
 data_yaml: data/fall/data.yaml
 epochs: 30
 image_size: 640

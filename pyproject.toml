@@ -22,6 +22,7 @@ dev = ["pytest>=8.0"]
 fall-train = "fall_detection.train:main"
 fall-evaluate = "fall_detection.evaluate:main"
 fall-detect = "fall_detection.detect:main"
+fall-image-evaluate = "fall_detection.image_evaluation:main"
 fall-geometry = "fall_detection.geometry:main"
 
 [tool.setuptools.packages.find]

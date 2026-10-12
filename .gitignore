@@ -6,3 +6,9 @@ __pycache__/
 data/fall/
 runs/
 *.pt
+
+.ultralytics/
+
+*.zip
+python-local.ps1
+PREPARATION_HANDOFF.md

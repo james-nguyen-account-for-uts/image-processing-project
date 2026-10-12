@@ -182,7 +182,7 @@ def test_yolo_default_training_evaluation_and_detection_are_preserved(tmp_path, 
     train.train(str(config))
     evaluate.evaluate(str(config))
     detect.detect(str(config), "0")
-    assert calls[0] == ("load", "yolo11n.pt")
+    assert calls[0] == ("load", "yolov8n.pt")
     assert calls[1][1]["epochs"] == 30 and calls[1][1]["device"] is None
     assert calls[3] == ("val", {"data": data.as_posix()})
     assert calls[5][1]["source"] == 0

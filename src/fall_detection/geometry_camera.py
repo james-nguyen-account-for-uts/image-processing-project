@@ -48,7 +48,7 @@ def detect_camera(config_path: str, source: int, model_path: str | None = None,
     rule = next((r for r in rules if r.name == chosen), None)
     if rule is None:
         raise ValueError(f"Unknown geometry rule: {chosen}")
-    detector_weights = detector_weights or "yolo11n.pt"
+    detector_weights = detector_weights or "yolov8n.pt"
     stamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     output_path = Path(output) if output is not None else (
         Path(settings.output_dir) / "predictions" / f"camera_{source}_{stamp}.jsonl")
