@@ -74,8 +74,7 @@ by the command above with a CUDA build, then confirm that CUDA is available:
 .venv\Scripts\python.exe -c "import torch; print(torch.cuda.is_available()); print(torch.cuda.get_device_name(0))"
 ```
 
-The default configuration uses GPU `0` when it is available. If CUDA is not
-installed, set `device: auto` in `configs/default.yaml` to use CPU fallback.
+The default configuration uses `device: auto`. Use `configs/gpu.yaml` to explicitly select GPU `0` when CUDA is installed.
 
 (for Windows) If PowerShell blocks activation, run the following command once in that terminal and then activate the environment again:
 
@@ -177,7 +176,7 @@ fall-detect --method geometry --source 0
 ```
 
 Repeat `--bbox` for multiple people, or use `--labels photo.txt` for YOLO annotations.
-Camera mode uses `yolo11n.pt` for person boxes only; Geometry decides Fall/No Fall. Press `Q`/`Esc`
+Camera mode uses `yolov8n.pt` for person boxes only; Geometry decides Fall/No Fall. Press `Q`/`Esc`
 or close the window to stop. Use `--detector-weights other.pt` to change the person detector
 (classes must include `person` or the configured Fall/Up classes), and `--detector-confidence 0.4`
 to change its confidence threshold. Frame results are saved as JSONL; use `--output camera.jsonl`
@@ -227,3 +226,7 @@ Expected output: working inference examples and a short test summary.
 ## Current scope
 
 This foundation provides a straightforward prototype, not a clinical or emergency-response system. Public-dataset results may not generalise to different people, rooms, camera angles, lighting, occlusion, or fall-like daily activities.
+
+## Image-level evaluation (Chovy)
+
+See [LOCAL_EVALUATION.md](LOCAL_EVALUATION.md) for validation-only threshold selection, frozen test evaluation, prediction CSVs, and error analysis. Detection mAP and geometry region-level evaluation remain separate.

@@ -1,0 +1,10 @@
+# Proposed full run; start only after dataset audit and smoke test.
+model: yolov8n.pt
+data_yaml: data/fall/data.yaml
+epochs: 50
+image_size: 640
+batch_size: 32
+device: 0
+confidence: 0.25
+project_dir: runs/fall_detection
+run_name: yolov8n_50e_b32

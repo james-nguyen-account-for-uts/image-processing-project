@@ -17,7 +17,7 @@ def add_method_arguments(parser) -> None:
 
 @dataclass(frozen=True)
 class Settings:
-    model: str = "yolo11n.pt"
+    model: str = "yolov8n.pt"
     data_yaml: str = "data/fall/data.yaml"
     epochs: int = 30
     image_size: int = 640

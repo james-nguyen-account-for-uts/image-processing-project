@@ -70,7 +70,7 @@ def main() -> None:
     parser.add_argument("--rule", choices=["aspect_ratio", "aspect_ratio_position"],
                         help="Geometry rule override; defaults to the validation-selected rule")
     parser.add_argument("--output", help="Geometry result path: .json for images, .jsonl for cameras")
-    parser.add_argument("--detector-weights", help="Geometry camera person detector (default: yolo11n.pt); separate from --weights model.json")
+    parser.add_argument("--detector-weights", help="Geometry camera person detector (default: yolov8n.pt); separate from --weights model.json")
     parser.add_argument("--detector-confidence", type=float, help="Geometry camera person detection confidence (default: 0.25)")
     parser.add_argument("--no-show", action="store_true", help="Geometry camera: disable display; stop with Ctrl+C")
     args = parser.parse_args()

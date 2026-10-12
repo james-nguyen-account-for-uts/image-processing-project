@@ -114,7 +114,7 @@ def test_camera_uses_frozen_rules_original_frame_pixels_and_no_person_state(save
     assert model.read_bytes() == original
     assert camera_runtime.source == 0
     assert camera_runtime.released and camera_runtime.destroyed and camera_runtime.displayed == 3
-    assert camera_runtime.calls[0] == ("load", "yolo11n.pt")
+    assert camera_runtime.calls[0] == ("load", "yolov8n.pt")
     for kind, call in camera_runtime.calls[1:]:
         assert kind == "predict"
         assert call["classes"] == [0] and call["conf"] == 0.25
