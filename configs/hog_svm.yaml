@@ -4,5 +4,5 @@ output_dir: runs/hog_svm
 fall_class: fall
 upright_class: up
 no_person_class: 0 person
-c_values: [0.1, 1.0, 10.0]
+c_values: [0.01, 0.1, 1.0, 10.0]
 random_seed: 42

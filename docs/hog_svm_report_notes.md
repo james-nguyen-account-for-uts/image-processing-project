@@ -37,13 +37,15 @@ or test. Manual inspection showed that this one image actually contains a
 visible person. Its annotated box was excluded rather than relabelled without
 an agreed ground truth. It is not counted as a true negative.
 
-The validation search compared C values 0.1, 1, and 10. All achieved Fall F1
-0.9858 and recall 0.9892 with their individually selected thresholds, so the
-documented tie-break selected the smallest C, 0.1. The selected Fall decision
-threshold was -0.7312863. The chosen model converged in 3,147 of 10,000
-permitted iterations. Some unselected candidates emitted convergence warnings.
+The validation search compared C values 0.01, 0.1, 1, and 10, as proposed in
+Assessment Task 1. C=0.01 gave the highest Fall F1 (0.98586) and recall
+(0.99053). Each of the other three values gave Fall F1 0.98584 and recall
+0.98917 with its selected threshold. The chosen decision threshold was
+-0.7226809. The selected model converged in 551 of 10,000 permitted
+iterations. Some unselected candidates emitted convergence warnings.
 
-The frozen model was evaluated once on the official test split:
+With those settings fixed, the model yielded these results on the official
+test split:
 
 | Metric | Test result |
 |---|---:|
@@ -56,9 +58,15 @@ The frozen model was evaluated once on the official test split:
 | False negatives | 2 |
 | Up false-positive rate | 12 / 105 = 0.1143 |
 
+An earlier run used only C={0.1, 1, 10} and its test results were inspected
+before the missing, pre-specified C=0.01 candidate was noticed. The corrected
+model was still selected using validation data only, and its test confusion
+counts did not change. The test set has been viewed more than once, so this
+should not be described as a single blind test evaluation.
+
 These are **person-region** scores with supplied ground-truth boxes. They
 cannot be ranked directly against YOLO's full-image detection results. One
-local evaluation pass took 3.07 seconds for 471 regions (6.51 ms per region),
+local evaluation pass took 3.09 seconds for 471 regions (6.56 ms per region),
 including image loading, crop, resize, HOG extraction, standardisation and SVM
 scoring. It excludes person localisation, model loading, metric calculation and
 file writing, and is not a cross-hardware benchmark.

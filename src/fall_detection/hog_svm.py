@@ -36,7 +36,7 @@ class HogSettings:
     fall_class: str = "fall"
     upright_class: str = "up"
     no_person_class: str = "0 person"
-    c_values: tuple[float, ...] = (0.1, 1.0, 10.0)
+    c_values: tuple[float, ...] = (0.01, 0.1, 1.0, 10.0)
     random_seed: int = 42
 
     def validate(self) -> None:
