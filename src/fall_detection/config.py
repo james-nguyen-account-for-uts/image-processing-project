@@ -5,14 +5,16 @@ import yaml
 
 
 def resolve_config(method: str, path: str | None) -> str:
-    if method not in {"yolo", "geometry"}:
+    if method not in {"yolo", "geometry", "hog_svm"}:
         raise ValueError(f"Unknown detection method: {method}")
-    return path or ("configs/geometry.yaml" if method == "geometry" else "configs/default.yaml")
+    defaults = {"yolo": "configs/default.yaml", "geometry": "configs/geometry.yaml",
+                "hog_svm": "configs/hog_svm.yaml"}
+    return path or defaults[method]
 
 
 def add_method_arguments(parser) -> None:
-    parser.add_argument("--method", choices=["yolo", "geometry"], default="yolo")
-    parser.add_argument("--config", help="Defaults to configs/default.yaml or configs/geometry.yaml by method")
+    parser.add_argument("--method", choices=["yolo", "geometry", "hog_svm"], default="yolo")
+    parser.add_argument("--config", help="Defaults to the method's config in configs/")
 
 
 @dataclass(frozen=True)

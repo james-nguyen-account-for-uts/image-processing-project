@@ -1,7 +1,9 @@
 .venv/
+.deps/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.pytest_tmp/
 .DS_Store
 data/fall/
 runs/

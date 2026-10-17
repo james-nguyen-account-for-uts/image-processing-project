@@ -35,6 +35,19 @@ def detect(config_path: str | None, source: str, weights: str | None = None, *,
         print(f"Image: {result['image_prediction'] or 'No person region supplied'}")
         print(f"Result saved to {result['output_path']}")
         return result
+    if method == "hog_svm":
+        if isinstance(parse_source(source), int):
+            raise ValueError("HOG-SVM requires an image and supplied person boxes; camera input is unsupported")
+        if rule is not None or detector_weights is not None or detector_confidence is not None or no_show:
+            raise ValueError("Geometry-only detection options cannot be used with HOG-SVM")
+        from .hog_svm import predict_image
+
+        result = predict_image(config_path, source, weights, boxes, labels, output)
+        for region in result["regions"]:
+            print(f"Region {region['region_id']}: {region['prediction']}, score={region['decision_score']:.4f}")
+        print(f"Image: {result['image_prediction'] or 'No person region supplied'}")
+        print(f"Result saved to {result['output_path']}")
+        return result
     if any(value is not None for value in (boxes, labels, rule, output, detector_weights, detector_confidence)) or no_show:
         raise ValueError("Geometry detection options require --method geometry")
 
@@ -61,15 +74,15 @@ def detect(config_path: str | None, source: str, weights: str | None = None, *,
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run fall detection")
     add_method_arguments(parser)
-    parser.add_argument("--source", required=True, help="Image, video, stream or camera index; Geometry supports images and camera indices")
-    parser.add_argument("--weights", "--model", dest="weights", help="YOLO .pt weights or Geometry model.json")
+    parser.add_argument("--source", required=True, help="Image, video, stream or camera index; HOG-SVM requires an image")
+    parser.add_argument("--weights", "--model", dest="weights", help="YOLO .pt, Geometry .json, or HOG-SVM .joblib")
     boxes = parser.add_mutually_exclusive_group()
     boxes.add_argument("--bbox", type=float, nargs=4, action="append", metavar=("X1", "Y1", "X2", "Y2"),
-                       help="Geometry person box in pixels; repeat for multiple people")
-    boxes.add_argument("--labels", help="YOLO annotation file supplying person boxes for Geometry")
+                       help="Supplied person box in pixels for Geometry/HOG-SVM; repeat for multiple people")
+    boxes.add_argument("--labels", help="YOLO annotation file supplying person boxes for Geometry/HOG-SVM")
     parser.add_argument("--rule", choices=["aspect_ratio", "aspect_ratio_position"],
                         help="Geometry rule override; defaults to the validation-selected rule")
-    parser.add_argument("--output", help="Geometry result path: .json for images, .jsonl for cameras")
+    parser.add_argument("--output", help="Geometry/HOG-SVM result path: .json for images, .jsonl for cameras")
     parser.add_argument("--detector-weights", help="Geometry camera person detector (default: yolo11n.pt); separate from --weights model.json")
     parser.add_argument("--detector-confidence", type=float, help="Geometry camera person detection confidence (default: 0.25)")
     parser.add_argument("--no-show", action="store_true", help="Geometry camera: disable display; stop with Ctrl+C")
@@ -84,6 +97,13 @@ def main() -> None:
             parser.error("--detector-weights, --detector-confidence and --no-show require a Geometry camera source")
         if args.detector_confidence is not None and not 0 <= args.detector_confidence <= 1:
             parser.error("--detector-confidence must be between 0 and 1")
+    elif args.method == "hog_svm":
+        if camera:
+            parser.error("HOG-SVM requires an image source and supplied person boxes")
+        if args.bbox is None and args.labels is None:
+            parser.error("HOG-SVM image detection requires --bbox or --labels")
+        if any(value is not None for value in (args.rule, args.detector_weights, args.detector_confidence)) or args.no_show:
+            parser.error("Geometry camera/rule options cannot be used with HOG-SVM")
     elif any(value is not None for value in (args.bbox, args.labels, args.rule, args.output,
                                            args.detector_weights, args.detector_confidence)) or args.no_show:
         parser.error("Geometry detection options require --method geometry")

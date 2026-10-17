@@ -13,6 +13,13 @@ def train(config_path: str | None = None, *, method: str = "yolo"):
         print_results(results)
         print(f"Geometry rules saved to {results['model_path']}")
         return results
+    if method == "hog_svm":
+        from .hog_svm import train_model
+
+        results = train_model(config_path)
+        print(f"HOG-SVM validation F1: {results['metrics']['fall_f1']:.4f}")
+        print(f"Model saved to {results['model_path']}")
+        return results
 
     from ultralytics import YOLO
 

@@ -15,6 +15,15 @@ def evaluate(config_path: str | None = None, weights: str | None = None, *,
         results = evaluate_saved(config_path, weights, split or "test")
         print_results(results)
         return results
+    if method == "hog_svm":
+        from .hog_svm import evaluate_model
+
+        results = evaluate_model(config_path, weights, split or "test")
+        m = results["metrics"]
+        print(f"{results['split']} HOG-SVM: regions={m['sample_count']}, precision={m['fall_precision']:.4f}, "
+              f"recall={m['fall_recall']:.4f}, F1={m['fall_f1']:.4f}")
+        print(f"Results saved to {results['output_dir']}")
+        return results
 
     from ultralytics import YOLO
 
@@ -37,8 +46,8 @@ def evaluate(config_path: str | None = None, weights: str | None = None, *,
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate the fall detector")
     add_method_arguments(parser)
-    parser.add_argument("--weights", "--model", dest="weights", help="YOLO .pt weights or Geometry model.json")
-    parser.add_argument("--split", choices=["val", "test"], help="Defaults to val for YOLO, test for Geometry")
+    parser.add_argument("--weights", "--model", dest="weights", help="YOLO .pt, Geometry .json, or HOG-SVM .joblib")
+    parser.add_argument("--split", choices=["val", "test"], help="Defaults to val for YOLO; test for Geometry/HOG-SVM")
     args = parser.parse_args()
     evaluate(args.config, args.weights, method=args.method, split=args.split)
 

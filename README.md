@@ -188,6 +188,42 @@ YOLO remains the default method. The original `fall-geometry` experiment command
 Without installed console commands, use `python scripts/run_fall.py train --method geometry`
 (replace `train` with `evaluate` or `detect` and pass the same options).
 
+## HOG-SVM person-region classifier
+
+The `hog_svm` method implements the second approach in Assessment Task 1. It
+uses the same supplied Fall/Up person boxes as the Geometry baseline. Each crop
+keeps its aspect ratio, is padded to 128 × 128 pixels, converted to grayscale,
+and represented by HOG features (9 orientations, 8 × 8 pixel cells, 2 × 2 cell
+blocks). A balanced linear SVM is fit on the training split. Validation selects
+the SVM `C` value and a Fall decision threshold using Fall F1, with recall as
+the tie-breaker. The test split is read only by `fall-evaluate`.
+
+Install the updated dependencies, place the Roboflow fall v1 YOLO export at
+`data/fall/`, and run from the repository root:
+
+```text
+fall-train --method hog_svm
+fall-evaluate --method hog_svm
+fall-detect --method hog_svm --source photo.jpg --bbox 100 100 500 300
+fall-detect --method hog_svm --source photo.jpg --labels photo.txt
+```
+
+Use `--config configs/hog_svm.yaml` to choose another dataset or output folder.
+On systems without installed console commands, use
+`python scripts/run_fall.py train --method hog_svm` (and replace `train` with
+`evaluate` or `detect`). Training writes `runs/hog_svm/model.joblib` and
+validation records to `runs/hog_svm/calibration/`. Evaluation writes metrics,
+predictions, false positives, missed falls, and a confusion matrix to
+`runs/hog_svm/evaluation/test/`. The `.joblib` model is a Python pickle; load
+only a model produced by a trusted local run.
+
+`0 person` annotations and empty-label images have no person crop and are
+excluded from region-level metrics. They are reported in `*_excluded.csv` and
+must not be counted as true negatives. A HOG-SVM result uses a supplied person
+location, while YOLO must locate people in full images; compare their results
+with that input difference stated. Detection from a camera is outside this
+region-level method.
+
 ## Simple team plan
 
 The work is deliberately split into small pieces. Nobody needs to redesign the repository.
