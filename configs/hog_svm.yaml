@@ -1,0 +1,6 @@
+data_yaml: data/data.yaml
+output_dir: runs/hog_svm
+fall_class: fall
+upright_class: up
+no_person_class: 0 person
+c_values: [0.01, 0.1, 1.0]

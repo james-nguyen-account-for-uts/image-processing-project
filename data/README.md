@@ -1,13 +1,12 @@
-# Dataset directory
+# Dataset placement
 
-Download Version 1 of the [Roboflow Fall dataset](https://universe.roboflow.com/search-kinvz/fall-ljaaq/dataset/1), export it in YOLO format, and extract it as:
+Extract the Roboflow Fall v1 YOLO export directly into this directory:
 
 ```text
-data/fall/
-├── data.yaml
-├── train/
-├── valid/
-└── test/        # May be absent if the export has no test split
+data.yaml
+train/images/  train/labels/
+valid/images/  valid/labels/
+test/images/   test/labels/
 ```
 
-Do not commit the downloaded images or labels.
+`data.yaml` must use `train: train/images`, `val: valid/images`, and `test: test/images` (relative to this directory), with names `['0 person', 'fall', 'up']`. Every image needs a matching YOLO label file. Dataset content is intentionally ignored by Git. All three experiment configs use `data/data.yaml`.

@@ -1,9 +1,9 @@
-model: yolo11n.pt
-data_yaml: data/fall/data.yaml
+model: yolov8n.pt
+data_yaml: data/data.yaml
 epochs: 30
 image_size: 640
 batch_size: 16
 device: 0
 confidence: 0.25
-project_dir: runs/fall_detection
+project_dir: runs/yolov8
 run_name: train

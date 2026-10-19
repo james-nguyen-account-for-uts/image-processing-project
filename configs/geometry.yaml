@@ -1,5 +1,5 @@
 # Run from the repository root. This baseline receives annotated person boxes.
-data_yaml: data/fall/data.yaml
+data_yaml: data/data.yaml
 output_dir: runs/geometry
 fall_class: fall
 upright_class: up
