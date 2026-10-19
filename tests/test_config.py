@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from fall_detection.config import Settings, load_settings
+from yolov8.config import Settings, load_settings
 
 
 def test_default_settings_are_valid() -> None:

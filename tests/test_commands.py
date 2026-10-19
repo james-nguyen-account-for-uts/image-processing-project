@@ -6,8 +6,9 @@ from pathlib import Path
 import pytest
 from PIL import Image
 
-from fall_detection import detect, evaluate, geometry, train
-from fall_detection.config import resolve_config
+from yolov8 import detect, evaluate, train
+from bounding_box import geometry
+from yolov8.config import resolve_config
 
 
 @pytest.fixture
@@ -166,7 +167,12 @@ def test_yolo_default_training_evaluation_and_detection_are_preserved(tmp_path, 
 
         def val(self, **kwargs):
             calls.append(("val", kwargs))
-            return types.SimpleNamespace(box=types.SimpleNamespace(map50=0.9, map=0.7))
+            import numpy as np
+            return types.SimpleNamespace(
+                names={0: 'fall', 1: 'up'},
+                box=types.SimpleNamespace(map50=0.9, map=0.7, ap_class_index=[0, 1],
+                                          p=[0.9, 0.8], r=[0.8, 0.7], f1=[0.85, 0.75]),
+                confusion_matrix=types.SimpleNamespace(matrix=np.array([[8, 1, 0], [1, 7, 0], [1, 2, 0]])))
 
         def predict(self, **kwargs):
             calls.append(("predict", kwargs))
@@ -182,11 +188,14 @@ def test_yolo_default_training_evaluation_and_detection_are_preserved(tmp_path, 
     train.train(str(config))
     evaluate.evaluate(str(config))
     detect.detect(str(config), "0")
-    assert calls[0] == ("load", "yolo11n.pt")
+    assert calls[0] == ("load", "yolov8n.pt")
     assert calls[1][1]["epochs"] == 30 and calls[1][1]["device"] is None
-    assert calls[3] == ("val", {"data": data.as_posix()})
+    assert calls[3][0] == "val" and calls[3][1]["data"] == data.as_posix()
+    assert calls[3][1]["project"] == tmp_path.as_posix()
     assert calls[5][1]["source"] == 0
     assert calls[5][1]["conf"] == 0.25
     assert calls[5][1]["show"] is True and calls[5][1]["save"] is True
+    detect.detect(str(config), "photo.jpg", no_show=True)
+    assert calls[-1][1]["show"] is False
     evaluate.evaluate(str(config), split="test")
-    assert calls[-1] == ("val", {"data": data.as_posix(), "split": "test"})
+    assert calls[-1][0] == "val" and calls[-1][1]["split"] == "test"

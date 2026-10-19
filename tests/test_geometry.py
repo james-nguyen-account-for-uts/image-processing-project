@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from fall_detection.geometry import (
+from bounding_box.geometry import (
     GeometryRule,
     GeometrySettings,
     Region,

@@ -5,7 +5,8 @@ import types
 import numpy as np
 import pytest
 
-from fall_detection import detect, geometry, geometry_camera
+from yolov8 import detect
+from bounding_box import geometry, geometry_camera
 
 
 @pytest.fixture
@@ -114,7 +115,7 @@ def test_camera_uses_frozen_rules_original_frame_pixels_and_no_person_state(save
     assert model.read_bytes() == original
     assert camera_runtime.source == 0
     assert camera_runtime.released and camera_runtime.destroyed and camera_runtime.displayed == 3
-    assert camera_runtime.calls[0] == ("load", "yolo11n.pt")
+    assert camera_runtime.calls[0] == ("load", "yolov8n.pt")
     for kind, call in camera_runtime.calls[1:]:
         assert kind == "predict"
         assert call["classes"] == [0] and call["conf"] == 0.25
@@ -219,7 +220,6 @@ def test_camera_cli_invalid_inputs(monkeypatch, extra):
 
 @pytest.mark.parametrize("argv", [
     ["--source", "0", "--detector-weights", "people.pt"],
-    ["--source", "0", "--no-show"],
     ["--method", "geometry", "--source", "photo.jpg", "--bbox", "0", "0", "10", "10", "--no-show"],
 ])
 def test_camera_options_do_not_leak_into_other_modes(monkeypatch, argv):
