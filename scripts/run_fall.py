@@ -18,4 +18,4 @@ parser.add_argument("command", choices=["train", "evaluate", "detect"])
 parser.add_argument("arguments", nargs=argparse.REMAINDER)
 args = parser.parse_args()
 sys.argv = [f"fall-{args.command}", *args.arguments]
-importlib.import_module(f"fall_detection.{args.command}").main()
+importlib.import_module(f"yolov8.{args.command}").main()

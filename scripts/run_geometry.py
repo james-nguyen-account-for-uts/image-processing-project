@@ -13,7 +13,7 @@ venv_packages = root / ".venv" / "Lib" / "site-packages"
 if venv_packages.is_dir():
     sys.path.append(str(venv_packages))
 
-from fall_detection.geometry import main
+from bounding_box.geometry import main
 
 if __name__ == "__main__":
     main()
