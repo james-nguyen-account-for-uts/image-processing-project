@@ -147,7 +147,7 @@ def detect(config_path='configs/hog_svm.yaml', source='0', labels=None, show=Tru
     model = load_model(config)
     from common.inference import run
     return run(source, lambda image, boxes: predict_boxes(image, boxes, model),
-               config.output_dir, 'HOG–SVM', labels=labels, data_yaml=config.data_yaml, show=show)
+               config.output_dir, 'HOG-SVM', labels=labels, data_yaml=config.data_yaml, show=show)
 
 
 def main():
